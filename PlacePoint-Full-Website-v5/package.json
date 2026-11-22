@@ -1,0 +1,10 @@
+{
+  "name": "placepoint-full-website",
+  "version": "5.0.0",
+  "private": true,
+  "description": "PlacePoint placement preparation portal - React frontend and Express/MongoDB backend",
+  "scripts": {
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev"
+  }
+}
