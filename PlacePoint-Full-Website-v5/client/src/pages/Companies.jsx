@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { companyBank, categoryInfo } from './companyQuestionBank';
-import { apiRequest, currentProfile, saveProgressToServer, studentStorageKey } from '../services/api';
+import { apiRequest, currentProfile, isDemoMode, saveProgressToServer, studentStorageKey } from '../services/api';
 
 const progressStorageKey = () => studentStorageKey('placepoint-company-progress', currentProfile()?.email);
 const readProgress = () => { try { return JSON.parse(localStorage.getItem(progressStorageKey()) || '{}'); } catch { return {}; } };
@@ -12,12 +12,14 @@ function useCompanyProgress() {
   useEffect(() => {
     let active = true;
     setProgress(readProgress());
-    apiRequest('/progress').then(({ progress: serverProgress }) => {
-      if (active && serverProgress?.companyProgress && Object.keys(serverProgress.companyProgress).length) {
-        saveProgress(serverProgress.companyProgress);
-        setProgress(serverProgress.companyProgress);
-      }
-    }).catch(error => console.warn('Company progress remains available locally:', error.message));
+    if (!isDemoMode) {
+      apiRequest('/progress').then(({ progress: serverProgress }) => {
+        if (active && serverProgress?.companyProgress && Object.keys(serverProgress.companyProgress).length) {
+          saveProgress(serverProgress.companyProgress);
+          setProgress(serverProgress.companyProgress);
+        }
+      }).catch(error => console.warn('Company progress remains available locally:', error.message));
+    }
     return () => { active = false; };
   }, [email]);
   return [progress, setProgress];
@@ -47,7 +49,7 @@ export function CompanyQuestionPractice(){
   useEffect(()=>{setIndex(0);setChoice(null);setResponse('');setRevealed(false);},[companyId,category]);
   const item=questions[index];
   const progressKey=`${companyId}:${category}:${index}`; const saved=progress[progressKey];
-  function submit(){ if(!item)return; const correct=item.open?null:choice===item.correct; const next={...progress,[progressKey]:{answered:true,correct,updatedAt:new Date().toISOString()}}; setProgress(next);saveProgress(next);saveProgressToServer({companyProgress:next}).catch(error=>console.error('Company progress sync failed; saved locally for retry:',error.message));setRevealed(true); }
+  function submit(){ if(!item)return; const correct=item.open?null:choice===item.correct; const next={...progress,[progressKey]:{answered:true,correct,updatedAt:new Date().toISOString()}}; setProgress(next);saveProgress(next);if(!isDemoMode){saveProgressToServer({companyProgress:next}).catch(error=>console.error('Company progress sync failed; saved locally for retry:',error.message));}setRevealed(true); }
   function nextQuestion(){setIndex(i=>(i+1)%questions.length);setChoice(null);setResponse('');setRevealed(false);}
   function previousQuestion(){setIndex(i=>Math.max(0,i-1));setChoice(null);setResponse('');setRevealed(false);}
   if(!company||!categoryMeta||!item)return <div className="content-page"><h2>Question module not found</h2><Link to="/companies">Back to companies</Link></div>;

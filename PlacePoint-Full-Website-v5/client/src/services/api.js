@@ -1,9 +1,26 @@
-const configuredApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').trim().replace(/\/+$/, '');
-// Accept either the backend origin (https://api.example.com) or an API base
-// that already ends in /api (https://api.example.com/api).
-const API_URL = configuredApiUrl.endsWith('/api')
-  ? configuredApiUrl
-  : `${configuredApiUrl}/api`;
+// Determine whether the app is running in portfolio demo mode.
+// 1. Explicit override via VITE_DEMO_MODE=true.
+// 2. In production (e.g. Vercel deployment), if VITE_API_URL is missing or points to localhost/127.0.0.1,
+//    demo mode is automatically enabled so that the deployed site never attempts to call a local backend.
+// 3. In local development (import.meta.env.DEV), demo mode is false by default so that full-stack
+//    development with Express and MongoDB works seamlessly.
+export const isDemoMode = (() => {
+  if (import.meta.env.VITE_DEMO_MODE === 'true') return true;
+  if (import.meta.env.DEV) return false;
+  const configured = (import.meta.env.VITE_API_URL || '').trim();
+  if (!configured) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configured)) return true;
+  return false;
+})();
+
+const resolveApiUrl = () => {
+  if (isDemoMode) return '';
+  const base = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '')).trim().replace(/\/+$/, '');
+  if (!base) return '';
+  return base.endsWith('/api') ? base : `${base}/api`;
+};
+
+export const API_URL = resolveApiUrl();
 
 export function studentStorageKey(base, email) {
   const normalizedEmail = String(email || 'guest').trim().toLowerCase();
@@ -11,6 +28,10 @@ export function studentStorageKey(base, email) {
 }
 
 export async function apiRequest(path, options = {}) {
+  if (isDemoMode) {
+    throw new Error('PlacePoint is running in portfolio demo mode. Backend API and database are available in local development.');
+  }
+
   const token = localStorage.getItem('placepoint-token');
   const endpoint = `${API_URL}${path.startsWith('/') ? path : `/${path}`}`;
   let response;
@@ -26,7 +47,7 @@ export async function apiRequest(path, options = {}) {
     });
   } catch (error) {
     const detail = error instanceof TypeError
-      ? `Cannot reach the PlacePoint API at ${API_URL}. Check that the backend is deployed/running and that VITE_API_URL points to it.`
+      ? `Cannot reach the PlacePoint API at ${API_URL}. Check that the backend is running locally and that MongoDB is active.`
       : error.message;
     throw new Error(detail);
   }
@@ -34,7 +55,7 @@ export async function apiRequest(path, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 404) {
-      throw new Error(data.message || `API endpoint not found: ${options.method || 'GET'} ${endpoint}. Confirm that the latest PlacePoint backend is deployed.`);
+      throw new Error(data.message || `API endpoint not found: ${options.method || 'GET'} ${endpoint}. Confirm that the PlacePoint backend is running.`);
     }
     throw new Error(data.message || `Request failed (${response.status})`);
   }
@@ -47,8 +68,9 @@ export function currentProfile() {
 }
 
 export async function saveProgressToServer(progress) {
+  if (isDemoMode) return null;
   const profile = currentProfile();
-  if (!profile?.email) return;
+  if (!profile?.email) return null;
   const pendingKey = studentStorageKey('placepoint-pending-progress', profile.email);
   let pending = {};
   try { pending = JSON.parse(localStorage.getItem(pendingKey) || '{}'); } catch { pending = {}; }

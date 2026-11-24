@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { currentProfile, saveProgressToServer, studentStorageKey } from '../services/api';
+import { currentProfile, isDemoMode, saveProgressToServer, studentStorageKey } from '../services/api';
 
 const languages = ['C', 'C++', 'Java', 'Python', 'JavaScript', 'C#', 'PHP', 'Go', 'SQL', 'Kotlin', 'Rust'];
 const levels = ['Beginner', 'Intermediate', 'Advanced'];
@@ -108,7 +108,7 @@ export default function Coding(){
     worker.postMessage({code,tests});
     timeoutRef.current=setTimeout(()=>{stopWorker();setRunResult({status:'timeout',message:'Time limit exceeded.'});},2000);
   }
-  function markComplete(problem){const next={...completed,[keyFor(problem)]:true};setCompleted(next);localStorage.setItem(completedStorageKey,JSON.stringify(next));saveProgressToServer({codingCompleted:next}).catch(error=>console.error('Progress sync failed; saved locally for retry:',error.message));}
+  function markComplete(problem){const next={...completed,[keyFor(problem)]:true};setCompleted(next);localStorage.setItem(completedStorageKey,JSON.stringify(next));if(!isDemoMode){saveProgressToServer({codingCompleted:next}).catch(error=>console.error('Progress sync failed; saved locally for retry:',error.message));}}
   return <div className="learning-page">
     <div className="page-intro"><div><div className="eyebrow">SKILL DEVELOPMENT / 02</div><h1>Code your <em>way forward.</em></h1><p>Choose a language, select a difficulty and build problem-solving confidence.</p></div><div className="intro-stamp code-stamp"><span>{'</>'}</span><small>BUILD<br/>SKILLS</small></div></div>
     <div className="code-toolbar"><div><span className="panel-kicker">CHOOSE A PROGRAMMING LANGUAGE</span><div className="language-options language-wrap">{languages.map(l=><button key={l} className={language===l?'active':''} onClick={()=>{stopWorker();setLanguage(l);setSelected(null);setShowHint(false);setRunResult(null)}}>{l}</button>)}</div></div><div className="code-note"><span aria-hidden="true">⌘</span><div><strong>{done} / {problems.length} completed</strong><small>{language} · {level} practice</small></div></div></div>

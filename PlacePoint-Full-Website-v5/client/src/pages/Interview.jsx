@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { apiRequest, studentStorageKey } from '../services/api';
+import { apiRequest, isDemoMode, studentStorageKey } from '../services/api';
 
 const languageBank = {
   C: [
@@ -107,9 +107,11 @@ export default function Interview() {
   async function finishInterview() {
     const completed = { date: new Date().toISOString(), languages: selected, answers, questions, category };
     localStorage.setItem(studentStorageKey('placepoint-last-interview', savedProfile?.email), JSON.stringify(completed));
-    try {
-      if (savedProfile?.email) await apiRequest('/interviews', { method: 'POST', body: JSON.stringify({ languages: selected, answers, questions, category }) });
-    } catch (error) { console.error('Interview sync failed:', error.message); }
+    if (!isDemoMode && savedProfile?.email) {
+      try {
+        await apiRequest('/interviews', { method: 'POST', body: JSON.stringify({ languages: selected, answers, questions, category }) });
+      } catch (error) { console.error('Interview sync failed:', error.message); }
+    }
     setStage('result'); setPaper(true);
   }
   const current = questions[index];
